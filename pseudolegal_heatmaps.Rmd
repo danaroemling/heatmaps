@@ -1,0 +1,283 @@
+---
+title: "(Pseudo)Legal Heat Maps"
+author: "Dana Roemling"
+date: '2024-02-14'
+output: html_document
+toc: true
+toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Legal and Pseudolegal Documents Heat maps
+
+## Setup 
+This RMD has all the code for creating the heat maps. 
+We start by setting up the workplace.
+
+```{r setting_up, echo=FALSE, message=FALSE, results='hide', warning=FALSE}
+# libraries
+library(tidyverse)
+library(dplyr)
+library(MASS)
+library(viridis)
+library(spatstat.geom) 
+
+# setup
+options(scipen=9)
+
+# data
+LLD <- read.csv(file = '/Users/dana/Documents/R/heatmaps_lal/LLD_All_Features_clean.csv', header = TRUE) 
+SCD <- read.csv(file = '/Users/dana/Documents/R/heatmaps_lal/SCD_All_Features_clean.csv', header = TRUE) 
+
+# correct names > remove /
+LLD$feature <- gsub("\\/", "", LLD$feature)
+SCD$feature <- gsub("\\/", "", SCD$feature)
+
+# gets unique features, counts occurrences, drops any under 10
+LLD_list_df <- LLD %>% group_by(feature) %>% summarize(count=n()) %>% filter(count >= 10)
+SCD_list_df <- SCD %>% group_by(feature) %>% summarize(count=n()) %>% filter(count >= 10)
+
+# for maths, different list to loop is needed
+LLD_list_names <- as.data.frame(unique(LLD$feature))
+SCD_list_names <- as.data.frame(unique(SCD$feature))
+colnames(LLD_list_names) <- "feature"
+colnames(SCD_list_names) <- "feature"
+
+# combine list
+both_list <- rbind(LLD_list_names, SCD_list_names) %>% unique() %>% dplyr::filter(!(feature == ""))
+
+# for the maths bit, we need functions to convert between measurements
+# acos works with radians, not with degrees
+deg2rad = function(deg) {
+  return((pi * deg) / 180)
+}
+
+rad2deg = function(rad) {
+  return((180 * rad) / pi)
+}
+```
+
+## Plot Creation
+
+Then we can automatically create all the relevant plots and output them in a folder for all features. We split this up in two chunks, one for the legal and one for the pseudolegal documents. 
+This code loops through the list of features that were marked / coded originally. Then it calculates a probability density estimation, in this case a kernel density estimation of the spatial dimensions of the feature on the page.
+Two maps or graphs per feature are created. The first is a histogram of the underlying (original) data mapped on the page, so we can understand where each feature predominantly occurs. The second graph is a visualisation of the kernel density estimation, again mapped on the page. 
+
+```{r plots_lld}
+# loop for LLD
+for (feature_item in LLD_list_df$feature) {
+  # get feature
+  LLD_feature <- LLD %>% dplyr::filter(feature == feature_item)
+  LLD_feature_coord <- LLD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+
+  # density calc
+  density_LLD <- kde2d(LLD_feature_coord$x, LLD_feature_coord$y)
+  density_LLD_df <- as.data.frame(density_LLD)
+  
+  # histogram
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/LLD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  print(
+    ggplot(LLD_feature_coord, aes(x=x, y=y) ) +
+    geom_hex(bins = 30, show.legend = FALSE) +
+    scale_fill_viridis(option = "magma", direction = -1) +
+    theme_bw() +
+    xlab(" ") +
+    ylab(" ") +
+    scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+    scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+    ggtitle(paste("LLD: ", feature_item),
+            subtitle = "Histogram")
+    )
+  dev.off()
+
+  # density plot
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/LLD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  print(
+    ggplot(density_LLD_df, aes(x, y)) +
+    stat_density_2d(aes(fill = ..level..),
+                    geom = "polygon",
+                    h = 150,
+                    n = 10,
+                    bins = 100,
+                    contour = TRUE,
+                    show.legend = FALSE,
+                    alpha = 0.5) +
+    scale_fill_distiller(palette = "YlOrRd", direction = 1, na.value = "transparent") +
+    theme_bw() +
+    xlab(" ") +
+    ylab(" ") +
+    scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+    scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+    ggtitle(paste("LLD: ", feature_item),
+            subtitle = "Density Plot")
+  )
+  dev.off()
+}
+```
+
+Same as above, but for the other subcorpus.
+
+```{r plots_scd}
+# loop for SCD
+for (feature_item in SCD_list_df$feature) {
+  # get feature
+  SCD_feature <- SCD %>% filter(feature == feature_item)
+  SCD_feature_coord <- SCD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+
+  # density calc
+  density_SCD <- kde2d(SCD_feature_coord$x, SCD_feature_coord$y)
+  density_SCD_df <- as.data.frame(density_SCD)
+
+  # histogram
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/SCD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  print(
+    ggplot(SCD_feature_coord, aes(x=x, y=y) ) +
+    geom_hex(bins = 30, show.legend = FALSE) +
+    scale_fill_viridis(option = "magma", direction = -1) +
+    theme_bw() +
+    xlab(" ") +
+    ylab(" ") +
+    scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+    scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+    ggtitle(paste("SCD: ", feature_item),
+            subtitle = "Histogram")
+  )
+  dev.off()
+
+  # density plot
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/SCD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  print(
+    ggplot(density_SCD_df, aes(x, y)) +
+    stat_density_2d(aes(fill = ..level..),
+                    geom = "polygon",
+                    h = 150,
+                    n = 10,
+                    bins = 100,
+                    contour = TRUE,
+                    show.legend = FALSE,
+                    alpha = 0.5) +
+    scale_fill_distiller(palette = "YlOrRd", direction = 1, na.value = "transparent") +
+    theme_bw() +
+    xlab(" ") +
+    ylab(" ") +
+    scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+    scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+    ggtitle(paste("SCD: ", feature_item),
+            subtitle = "Density Plot")
+  )
+  dev.off()
+}
+```
+
+## Single Plots
+
+We can also just create single plots and not automate the creation by looping through the features. This also allows for tweaking the visualisation if necessary. First is the Histogram. 
+
+```{r single_histogram}
+LLD_feature <- LLD %>% filter(feature == "footer")
+LLD_feature_coord <- LLD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+density_LLD <- kde2d(LLD_feature_coord$x, LLD_feature_coord$y)
+density_LLD_df <- kde2d(LLD_feature_coord$x, LLD_feature_coord$y) %>% as.data.frame()
+
+SCD_feature <- SCD %>% filter(feature == "footer")
+SCD_feature_coord <- SCD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+density_SCD <- kde2d(SCD_feature_coord$x, SCD_feature_coord$y)
+density_SCD_df <- kde2d(SCD_feature_coord$x, SCD_feature_coord$y) %>% as.data.frame()
+
+ggplot(SCD_feature_coord, aes(x=x, y=y) ) +
+  geom_hex(bins = 30, show.legend = FALSE) +
+  scale_fill_viridis(option = "magma", direction = -1) +
+  theme_bw() +
+  xlab(" ") + 
+  ylab(" ") +
+  scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+  scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+  ggtitle("SCD: Footer",
+          subtitle = "Histogram") 
+```
+
+Second is the density plot.
+
+```{r single_density_plot}
+ggplot(density_SCD_df, aes(x, y)) +
+    stat_density_2d(aes(fill = ..level..),
+                    geom = "polygon",
+                    h = 150,
+                    n = 10,
+                    bins = 100,
+                    contour = TRUE,
+                    show.legend = FALSE,
+                    alpha = 0.5) +
+    scale_fill_distiller(palette = "YlOrRd", direction = 1, na.value = "transparent") +
+    theme_bw() +
+    xlab(" ") +
+    ylab(" ") +
+    scale_x_continuous(expand=c(0, 0), limits=c(0, 1700)) +
+    scale_y_continuous(expand=c(0, 0), limits=c(2210, 0), trans = "reverse") +
+    ggtitle("SCD: Footer",
+            subtitle = "Density Plot")
+```
+
+## Comparison
+
+If we want to mathematically compare which feature differs the most between SCD and LLD, we can calculate the angle between the features. 
+In order to do this, a kernel density estimation is run for a feature for both subcorpora. Then the mean density point is calculated and added to a matrix. With this, we have three points, (0,0) and the two density estimation means. They form a triangle, with a different size angle at the zero point of the graph. We calculate this angle for each feature and append it to a matrix, which we then sort.
+
+```{r angle_calc}
+results_matrix <- as.data.frame(matrix(NA, ncol = 1, nrow = 33))
+colnames(results_matrix) <- "distance"
+rownames(results_matrix) <- both_list$feature
+
+# loop
+for (feature_item in both_list$feature) {
+  # feature
+  temp_feature <- feature_item
+  
+  # get feature
+  LLD_feature <- LLD %>% dplyr::filter(feature == feature_item)
+  LLD_feature_coord <- LLD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+  SCD_feature <- SCD %>% filter(feature == feature_item)
+  SCD_feature_coord <- SCD_feature %>% dplyr::select(x, y) %>% as.data.frame()
+  
+  # density calc
+  density_LLD <- kde2d(LLD_feature_coord$x, LLD_feature_coord$y)
+  density_LLD_df <- as.data.frame(density_LLD)
+  density_SCD <- kde2d(SCD_feature_coord$x, SCD_feature_coord$y)
+  density_SCD_df <- as.data.frame(density_SCD)
+  
+  # set up matrix for distance calculation
+  points <- matrix(0, ncol = 3, nrow = 2)
+  rownames(points) <- c("x", "y")
+  colnames(points) <- c("start", "lld", "scd")
+  
+  # assign the mean of the coordinate points from density output
+  points[1,2] <- mean(density_LLD_df$x, trim = 0, na.rm = FALSE)
+  points[2,2] <- mean(density_LLD_df$y, trim = 0, na.rm = FALSE)
+  points[1,3] <- mean(density_SCD_df$x, trim = 0, na.rm = FALSE)
+  points[2,3] <- mean(density_SCD_df$y, trim = 0, na.rm = FALSE)
+  
+  # calculate distances between the points
+  distance_start_lld = crossdist(points[1,1], points[2,1], points[1,2], points[2,2]) 
+  distance_start_scd = crossdist(points[1,1], points[2,1], points[1,3], points[2,3]) 
+  distance_lld_scd = crossdist(points[1,2], points[2,2], points[1,3], points[2,3]) 
+  
+  # (distance_lld_scd)^2 = (distance_start_scd)^2 + (distance_start_lld)^2 - 2 (distance_start_scd * distance_start_lld) * cos^-1
+  # cos^-1 is acos()
+  
+  number_calc <- ((distance_start_scd^2) + (distance_start_lld^2) - (distance_lld_scd^2)) / (2*distance_start_scd*distance_start_lld)
+  angle_radian <- acos(number_calc)
+  
+  # convert to degrees
+  angle_degree <- rad2deg(angle_radian)
+  
+  # assign output
+  results_matrix[temp_feature, 1] <- angle_degree
+  
+}
+
+# sort the results  
+results <- results_matrix %>% arrange(desc(distance))
+```

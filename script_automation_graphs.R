@@ -1,12 +1,15 @@
 # libraries
-library(tidyverse)
-library(dplyr)
-library(MASS)
-library(viridis)
-library(spatstat.geom) 
+library(tidyverse) # for the general graphs
+library(dplyr) # for handling the data
+library(MASS) # for density estimation
+library(colorRamp2) # to generate color palettes
+library(spatstat.geom) # for geometrical maths
 
 # setup
 options(scipen=9)
+
+# define colours for heatmap
+mycolors <- colorRampPalette(c("white", "#cc0000"))(250)
 
 # for the maths bit, we need functions to convert between measurements
 # acos works with radians, not with degrees
@@ -45,13 +48,9 @@ for (feature_item in LLD_list_df$feature) {
   # get feature
   LLD_feature <- LLD %>% dplyr::filter(feature == feature_item)
   LLD_feature_coord <- LLD_feature %>% dplyr::select(x, y) %>% as.data.frame()
-
-  # density calc
-  density_LLD <- kde2d(LLD_feature_coord$x, LLD_feature_coord$y)
-  density_LLD_df <- as.data.frame(density_LLD)
   
   # histogram
-  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/LLD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/second_outputs/LLD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
   print(
     ggplot(LLD_feature_coord, aes(x=x, y=y) ) +
     geom_hex(bins = 30, show.legend = FALSE) +
@@ -67,18 +66,17 @@ for (feature_item in LLD_list_df$feature) {
   dev.off()
 
   # density plot
-  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/LLD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/second_outputs/LLD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
   print(
-    ggplot(density_LLD_df, aes(x, y)) +
-    stat_density_2d(aes(fill = ..level..),
-                    geom = "polygon",
-                    h = 150,
-                    n = 10,
-                    bins = 100,
-                    contour = TRUE,
-                    show.legend = FALSE,
-                    alpha = 0.5) +
-    scale_fill_distiller(palette = "YlOrRd", direction = 1, na.value = "transparent") +
+    ggplot(LLD_feature_coord, 
+           aes(x, y)) +
+      stat_density_2d_filled(geom = "density_2d_filled",
+                             contour_var = "ndensity",
+                             n = 50,
+                             bins = 250,
+                             show.legend = FALSE) +
+      scale_fill_manual(values = mycolors,
+                        na.value = "transparent") +
     theme_bw() +
     xlab(" ") +
     ylab(" ") +
@@ -98,12 +96,8 @@ for (feature_item in SCD_list_df$feature) {
   SCD_feature <- SCD %>% filter(feature == feature_item)
   SCD_feature_coord <- SCD_feature %>% dplyr::select(x, y) %>% as.data.frame()
 
-  # density calc
-  density_SCD <- kde2d(SCD_feature_coord$x, SCD_feature_coord$y)
-  density_SCD_df <- as.data.frame(density_SCD)
-
   # histogram
-  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/SCD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/second_outputs/SCD_histogram_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
   print(
     ggplot(SCD_feature_coord, aes(x=x, y=y) ) +
     geom_hex(bins = 30, show.legend = FALSE) +
@@ -119,18 +113,17 @@ for (feature_item in SCD_list_df$feature) {
   dev.off()
 
   # density plot
-  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/first_outputs/SCD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
+  jpeg(paste0("/Users/dana/Documents/R/heatmaps_lal/second_outputs/SCD_density_", feature_item,".jpeg"), units = "in", width = 6, height = 7.5, res = 300)
   print(
-    ggplot(density_SCD_df, aes(x, y)) +
-    stat_density_2d(aes(fill = ..level..),
-                    geom = "polygon",
-                    h = 150,
-                    n = 10,
-                    bins = 100,
-                    contour = TRUE,
-                    show.legend = FALSE,
-                    alpha = 0.5) +
-    scale_fill_distiller(palette = "YlOrRd", direction = 1, na.value = "transparent") +
+    ggplot(SCD_feature_coord, 
+           aes(x, y)) +
+      stat_density_2d_filled(geom = "density_2d_filled",
+                             contour_var = "ndensity",
+                             n = 50,
+                             bins = 250,
+                             show.legend = FALSE) +
+      scale_fill_manual(values = mycolors,
+                        na.value = "transparent") +
     theme_bw() +
     xlab(" ") +
     ylab(" ") +

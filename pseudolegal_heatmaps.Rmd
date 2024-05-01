@@ -60,11 +60,9 @@ SCD_list_names <- as.data.frame(unique(SCD$feature))
 colnames(LLD_list_names) <- "feature"
 colnames(SCD_list_names) <- "feature"
 
-# combine lists into one
-both_list <- rbind(LLD_list_names, 
-                   SCD_list_names) %>% 
-  unique() %>% 
-  dplyr::filter(!(feature == ""))
+# find intersection of the feature lists
+both_list <- intersect(LLD_list_names, 
+                   SCD_list_names)
 
 # for the maths bit, we need functions to convert between measurements
 # acos works with radians, not with degrees
@@ -324,7 +322,7 @@ In order to do this, a kernel density estimation is run for a feature for both s
 # nrow needs to be the number of features
 results_matrix <- as.data.frame(matrix(NA, 
                                        ncol = 1, 
-                                       nrow = 33))
+                                       nrow = 35))
 colnames(results_matrix) <- "distance"
 rownames(results_matrix) <- both_list$feature
 
@@ -349,10 +347,12 @@ for (feature_item in both_list$feature) {
   # density calculation and transformation into df
   ## above this happens within ggplot2
   density_LLD <- kde2d(LLD_feature_coord$x, 
-                       LLD_feature_coord$y)
+                       LLD_feature_coord$y,
+                       h = 50)
   density_LLD_df <- as.data.frame(density_LLD)
   density_SCD <- kde2d(SCD_feature_coord$x, 
-                       SCD_feature_coord$y)
+                       SCD_feature_coord$y,
+                       h = 50)
   density_SCD_df <- as.data.frame(density_SCD)
   
   # set up matrix for distance calculation

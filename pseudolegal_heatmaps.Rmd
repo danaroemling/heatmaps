@@ -413,6 +413,115 @@ for (feature_item in both_list$feature) {
 }
 
 # sort the results  
-results <- results_matrix %>% 
+results_zerobase <- results_matrix %>% 
   arrange(desc(distance))
+
+
+
+## second loop with different reference point
+# loop over all features
+for (feature_item in both_list$feature) {
+  # create temporary feature variable
+  temp_feature <- feature_item
+  
+  # get feature and coordinates from dataframes
+  ## same as above
+  LLD_feature <- LLD %>% 
+    dplyr::filter(feature == feature_item)
+  LLD_feature_coord <- LLD_feature %>% 
+    dplyr::select(x, y) %>% 
+    as.data.frame()
+  SCD_feature <- SCD %>% 
+    filter(feature == feature_item)
+  SCD_feature_coord <- SCD_feature %>% 
+    dplyr::select(x, y) %>% 
+    as.data.frame()
+  
+  # density calculation and transformation into df
+  ## above this happens within ggplot2
+  density_LLD <- kde2d(LLD_feature_coord$x, 
+                       LLD_feature_coord$y,
+                       h = 50)
+  density_LLD_df <- as.data.frame(density_LLD)
+  density_SCD <- kde2d(SCD_feature_coord$x, 
+                       SCD_feature_coord$y,
+                       h = 50)
+  density_SCD_df <- as.data.frame(density_SCD)
+  
+  # set up matrix for distance calculation
+  points <- matrix(0, 
+                   ncol = 3, 
+                   nrow = 2)
+  rownames(points) <- c("x", 
+                        "y")
+  colnames(points) <- c("start", 
+                        "lld", 
+                        "scd")
+  
+  # assign the mean of the coordinate points from density output
+  ## since we require two pairs of coordinates, we need to average over 
+  ## 4 coordinate points in total
+  points[1,2] <- mean(density_LLD_df$x, 
+                      trim = 0, 
+                      na.rm = FALSE)
+  points[2,2] <- mean(density_LLD_df$y, 
+                      trim = 0, 
+                      na.rm = FALSE)
+  points[1,3] <- mean(density_SCD_df$x, 
+                      trim = 0, 
+                      na.rm = FALSE)
+  points[2,3] <- mean(density_SCD_df$y, 
+                      trim = 0, 
+                      na.rm = FALSE)
+  # this assigns the different reference point
+  points[1,1] <- 0
+  points[2,1] <- 2200
+  
+  # calculate distances between the points
+  ## 3 calculations, because we have three points / three lines
+  distance_start_lld = crossdist(points[1,1], 
+                                 points[2,1], 
+                                 points[1,2], 
+                                 points[2,2]) 
+  distance_start_scd = crossdist(points[1,1], 
+                                 points[2,1], 
+                                 points[1,3], 
+                                 points[2,3]) 
+  distance_lld_scd = crossdist(points[1,2], 
+                               points[2,2], 
+                               points[1,3], 
+                               points[2,3]) 
+  
+  # this calculates the angle between SCD and LLD
+  # https://math.stackexchange.com/questions/292935/how-do-i-find-the-angles-of-a-triangle-if-i-only-have-the-lengths-of-the-sides
+  number_calc <- ((distance_start_scd^2) + 
+                    (distance_start_lld^2) - 
+                    (distance_lld_scd^2)) / 
+    (2*distance_start_scd*distance_start_lld)
+  angle_radian <- acos(number_calc)
+  
+  # convert to degrees
+  angle_degree <- rad2deg(angle_radian)
+  
+  # assign output to matrix
+  results_matrix[temp_feature, 1] <- angle_degree
+  
+}
+
+# sort the results  
+results_2kbase <- results_matrix %>% 
+  arrange(desc(distance))
+
+results_average <- merge(results_zero, 
+                         results_2200, 
+                         by = "feature")
+colnames(results_average) <- c("feature", 
+                               "angle_1", 
+                               "angle_2")
+results_average <- results_average %>% 
+  rowwise() %>% 
+  mutate(mean = mean(c(angle_1, angle_2)))
+
+results_average <- results_average %>% 
+  arrange(desc(mean))
 ```
